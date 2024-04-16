@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useQuery } from 'react-query';
 import './App.css';
 import Navbar from './Navbar';
 import { AgGridReact } from 'ag-grid-react';
@@ -51,71 +52,139 @@ const NewRowModal = ({ isOpen, onSave, onClose, editRow }) => {
 
 const App = () => {
   const gridRef = useRef(null);
-  const [rowData, setRowData] = useState([]);
+  // const [rowData, setRowData] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const fetchIssues = () => {
-    const criteria = JSON.stringify({
+  const processFilters = (filters) => {
+    const processedFilters = [];
+  
+    // if (filters['issue_responsiblecontactpersontext']) {
+    //   const filterValue = filters['issue_responsiblecontactpersontext'].filter;
+    //   // Assuming you want to check this value against two fields: firstname and surname
+    //   processedFilters.push({
+    //     field: 'issue_responsiblecontactperson_firstname',
+    //     operator: 'TEXT_IS_LIKE',
+    //     value: filterValue
+    //   });
+    //   processedFilters.push({
+    //     field: 'issue_responsiblecontactperson_surname',
+    //     operator: 'TEXT_IS_LIKE',
+    //     value: filterValue
+    //   });
+    // }
+
+    if (filters['issue_responsiblecontactpersontext']) {
+      const filterValue = filters['issue_responsiblecontactpersontext'].filter;
+      // Assuming you want to check this value against two fields: firstname and surname
+      processedFilters.push({
+        "field": "issue_responsiblecontactpersontext",
+              "comparison": "TEXT_IS_LIKE",
+              "value": filterValue
+            });
+    }
+  
+    // Add additional complex filter logic as needed
+  
+    return processedFilters;
+  };
+
+  const fetchGridData = async ({ queryKey }) => {
+    const [_key, { filters, sortModel }] = queryKey;
+    const url = '/rpc/issue/?method=ISSUE_SEARCH';
+    const criteria = {
       "fields": [
-        {"name": "issue_reference"},
-        {"name": "issue_raiseddate"},
+        // {"name": "issue_reference"},
+        // {"name": "issue_raiseddate"},
         {"name": "issue_responsiblecontactpersontext"},
-        {"name": "issue_causecontactpersontext"},
-        {"name": "issue_responsiblecontactperson_streetstate"},
-        {"name": "issue_responsiblecontactperson_contactbusiness_tradename"},
-        {"name": "issue_responsiblecontactbusinesstext"},
-        {"name": "issue_title"},
-        {"name": "issue_seissueidentification"},
-        {"name": "issue_seimpact"},
-        {"name": "issue_statustext"},
-        {"name": "issue_seclientobject1_firstname"},
+        // {"name": "issue_causecontactpersontext"},
+        // {"name": "issue_responsiblecontactperson_streetstate"},
+        // {"name": "issue_responsiblecontactperson_contactbusiness_tradename"},
+        // {"name": "issue_responsiblecontactbusinesstext"},
+        // {"name": "issue_title"},
+        // {"name": "issue_seissueidentification"},
+        // {"name": "issue_seimpact"},
+        // {"name": "issue_statustext"},
+        // {"name": "issue_seclientobject1_firstname"},
       ],
-      "sorts": [
-        {"name": "issue_raiseddate", "direction": "desc"}
+      "summaryFields":
+      [
+        {
+          "name": "count(*) issuecount"
+        }
       ],
-      "options": {
+      "filters": processFilters(filters),
+      "sorts":
+      [ 
+        // { 
+        //   "name": "issue_modifieddate",
+        //   "direction": "desc"
+        // }
+      ],
+      "options":
+      {
         "rf": "json",
         "startrow": "0",
         "rows": 10	
       }
-    });
-  
-    // Using URLSearchParams to encode the data
-    const urlEncodedData = new URLSearchParams();
-    urlEncodedData.append("criteria", criteria);
-  
-    axios.post('/rpc/issue/?method=ISSUE_SEARCH', urlEncodedData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      }
-    })
-    .then(response => {
-      // Assuming response.data.data.rows contains the issues array
-      setRowData(response.data.data.rows.map(item => ({
-        id: item.id, // Ensure you have a unique identifier
-        reference: item.issue_reference, // Adjust these fields based on your actual data
-        title: item.issue_title,
-        raiseddate: item.issue_raiseddate,
-        responsiblecontactpersontext: item.issue_responsiblecontactpersontext,
-        causecontactpersontext: item.issue_causecontactpersontext,
-        responsiblecontactperson_streetstate: item.issue_responsiblecontactperson_streetstate,
-        responsiblecontactperson_contactbusiness_tradename: item.issue_responsiblecontactperson_contactbusiness_tradename,
-        responsiblecontactbusinesstext: item.issue_responsiblecontactbusinesstext,
-        seissueidentification: item.issue_seissueidentification,
-        seimpact: item.issue_seimpact,
-        statustext: item.issue_statustext,
-        seclientobject1_firstname: item.issue_seclientobject1_firstname,
-      })));
-    })
-    .catch(error => {
-      console.error('There was a problem with the Axios operation:', error);
-      // Handle errors here
-    });
-  };
+        }
 
-  useEffect(() => {
-    fetchIssues();
-  }, []);
+    // if (filters['responsiblecontactpersontext']) {
+    //   const adviserFilter = filters['responsiblecontactpersontext'];
+    //   if (adviserFilter.filter) {  // Make sure the filter value exists
+    //     criteria.filter.push({
+    //       "field": "issue_responsiblecontactpersontext",
+    //       "operator": "TEXT_IS_LIKE",
+    //       "value": adviserFilter.filter
+    //     });
+    //   }
+    // }
+
+    // Loop through all filters from AG-Grid and add them to the criteria
+    // Object.entries(filters).forEach(([key, filter]) => {
+    //   if (filter.filterType === 'text' && filter.type === 'contains' && filter.filter) {
+    //     criteria.filter.push({
+    //       "field": key,
+    //       "operator": "TEXT_IS_LIKE",  // Assuming TEXT_IS_LIKE is the backend supported operator for contains
+    //       "value": filter.filter
+    //     });
+    //   }
+    // });
+
+    console.log('Updated criteria with filters:', criteria);
+    
+        const params = new URLSearchParams({ criteria: JSON.stringify(criteria) });
+    const response = await axios.post(url, params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+    });
+
+    return response.data.data.rows; // Modify based on your API's response
+};
+
+const { data: rowData, refetch } = useQuery(['gridData', { filters: {}, sortModel: [] }], fetchGridData, {
+  refetchOnWindowFocus: false, // Prevents refetching when the window gains focus
+  refetchOnMount: false, 
+  keepPreviousData: true, // Enable this to keep old data while loading new data
+});
+   
+const onFilterChanged = useCallback((event) => {
+  const allFilters = event.api.getFilterModel();
+  console.log('Current Filters:', allFilters);
+
+  // Assuming refetch is properly set up to handle this structure:
+  refetch(['gridData', { filters: allFilters, sortModel: [] }]);
+}, [refetch]);
+
+// const onSortChanged = useCallback(() => {
+//   if (gridRef.current) {
+//     const allColumnsState = gridRef.current.api.getColumnState();
+//     const sortedColumn = allColumnsState.find(s => s.sort != null);
+//     if (sortedColumn) {
+//       setSortModel([sortedColumn]);
+//     } else {
+//       setSortModel([]);
+//     }
+//   }
+// }, []);
 
   const handleSearchChange = (searchValue) => {
     gridRef.current.api.setQuickFilter(searchValue);
@@ -195,9 +264,9 @@ const App = () => {
   const [selectedRowData, setSelectedRowData] = useState(null);
 
   const [columnDefs] = useState([
-    { field: 'reference', headerName: 'Reference', flex: 1, minWidth: 100, filter: 'agTextColumnFilter' },
+    { field: 'issue_reference', headerName: 'Reference', flex: 1, minWidth: 100, filter: 'agTextColumnFilter' },
     { field: 'raiseddate', headerName: 'Date', flex: 1, minWidth: 100, filter: 'agDateColumnFilter' },
-    { field: 'responsiblecontactpersontext', headerName: 'Adviser', flex: 1, minWidth: 100, filter: 'agTextColumnFilter' },
+    { field: 'issue_responsiblecontactpersontext', headerName: 'Adviser', flex: 1, minWidth: 100, filter: 'agTextColumnFilter', filterParams: { newRowsAction: 'keep' } },
     { field: 'causecontactpersontext', headerName: 'Responsible Person', flex: 1, minWidth: 100, filter: 'agTextColumnFilter' },
     { field: 'responsiblecontactperson_streetstate', headerName: 'State', flex: 1, minWidth: 100, filter: 'agTextColumnFilter' },
     { field: 'responsiblecontactperson_contactbusiness_tradename', headerName: 'Licensee', flex: 1, minWidth: 100, filter: 'agTextColumnFilter' },
@@ -237,8 +306,13 @@ const App = () => {
           rowData={rowData}
           domLayout='autoHeight'
           rowSelection="single"
-          pagination={true} // Enable pagination
-          paginationPageSize={20} // Set the number of rows per page
+          pagination={true}
+          paginationPageSize={20}
+          onFilterChanged={onFilterChanged}
+          // onSortChanged={onSortChanged}
+          // Disable AG-Grid built-in filtering and sorting since server-side is used
+          enableServerSideSorting={true}
+          enableServerSideFilter={true}
           //Added the line below for returning row ID
           // onRowClicked={onRowClicked}
         ></AgGridReact>
