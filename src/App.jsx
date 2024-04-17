@@ -56,6 +56,9 @@ const App = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const processFilters = (filters) => {
+    //Log the previous filters before processing
+    console.log('These are my filters before processing.')
+    console.log(filters);
     const processedFilters = [];
   
     // if (filters['issue_responsiblecontactpersontext']) {
@@ -84,6 +87,8 @@ const App = () => {
     }
   
     // Add additional complex filter logic as needed
+    console.log('here are my processed filters');
+    console.log(processedFilters);
   
     return processedFilters;
   };
@@ -91,7 +96,7 @@ const App = () => {
   const fetchGridData = async ({ queryKey }) => {
     const [_key, { filters, sortModel }] = queryKey;
     const url = '/rpc/issue/?method=ISSUE_SEARCH';
-    const criteria = {
+    let criteria = {
       "fields": [
         // {"name": "issue_reference"},
         // {"name": "issue_raiseddate"},
@@ -158,33 +163,33 @@ const App = () => {
     });
 
     return response.data.data.rows; // Modify based on your API's response
-};
+  };
 
-const { data: rowData, refetch } = useQuery(['gridData', { filters: {}, sortModel: [] }], fetchGridData, {
-  refetchOnWindowFocus: false, // Prevents refetching when the window gains focus
-  refetchOnMount: false, 
-  keepPreviousData: true, // Enable this to keep old data while loading new data
-});
-   
-const onFilterChanged = useCallback((event) => {
-  const allFilters = event.api.getFilterModel();
-  console.log('Current Filters:', allFilters);
+  const { data: rowData, refetch } = useQuery(['gridData', { filters: {}, sortModel: [] }], fetchGridData, {
+    refetchOnWindowFocus: false, // Prevents refetching when the window gains focus
+    refetchOnMount: false, 
+    keepPreviousData: true, // Enable this to keep old data while loading new data
+  });
+    
+  const onFilterChanged = useCallback((event) => {
+    const allFilters = event.api.getFilterModel();
+    console.log('Current Filters:', allFilters);
 
-  // Assuming refetch is properly set up to handle this structure:
-  refetch(['gridData', { filters: allFilters, sortModel: [] }]);
-}, [refetch]);
+    // Assuming refetch is properly set up to handle this structure:
+    refetch(['gridData', { filters: allFilters, sortModel: [] }]);
+  }, [refetch]);
 
-// const onSortChanged = useCallback(() => {
-//   if (gridRef.current) {
-//     const allColumnsState = gridRef.current.api.getColumnState();
-//     const sortedColumn = allColumnsState.find(s => s.sort != null);
-//     if (sortedColumn) {
-//       setSortModel([sortedColumn]);
-//     } else {
-//       setSortModel([]);
-//     }
-//   }
-// }, []);
+  // const onSortChanged = useCallback(() => {
+  //   if (gridRef.current) {
+  //     const allColumnsState = gridRef.current.api.getColumnState();
+  //     const sortedColumn = allColumnsState.find(s => s.sort != null);
+  //     if (sortedColumn) {
+  //       setSortModel([sortedColumn]);
+  //     } else {
+  //       setSortModel([]);
+  //     }
+  //   }
+  // }, []);
 
   const handleSearchChange = (searchValue) => {
     gridRef.current.api.setQuickFilter(searchValue);
@@ -196,27 +201,27 @@ const onFilterChanged = useCallback((event) => {
   };
 
   const handleSaveNewRow = (newOrUpdatedRow) => {
-    // Check if we're editing an existing row (indicated by the presence of an 'id')
-    if (newOrUpdatedRow.id) {
-      // Editing existing row
-      // Make sure the object structure here matches what's expected by your grid and backend
-      const updatedRows = rowData.map(row => 
-        row.id === newOrUpdatedRow.id 
-        ? { ...row, reference: newOrUpdatedRow.reference, title: newOrUpdatedRow.title } 
-        : row
-      );
-      setRowData(updatedRows);
-    } else {
-      // Adding a new row
-      // Generate a new unique ID for the new issue
-      const newId = rowData.length > 0 ? Math.max(...rowData.map(r => r.id)) + 1 : 1;
-      // Ensure the new object structure matches your data model
-      setRowData([...rowData, { ...newOrUpdatedRow, id: newId, reference: newOrUpdatedRow.reference, title: newOrUpdatedRow.title }]);
-    }
-    // Close the modal and reset any selections
-    setIsModalOpen(false);
-    setSelectedRowData(null);
-};
+      // Check if we're editing an existing row (indicated by the presence of an 'id')
+      if (newOrUpdatedRow.id) {
+        // Editing existing row
+        // Make sure the object structure here matches what's expected by your grid and backend
+        const updatedRows = rowData.map(row => 
+          row.id === newOrUpdatedRow.id 
+          ? { ...row, reference: newOrUpdatedRow.reference, title: newOrUpdatedRow.title } 
+          : row
+        );
+        setRowData(updatedRows);
+      } else {
+        // Adding a new row
+        // Generate a new unique ID for the new issue
+        const newId = rowData.length > 0 ? Math.max(...rowData.map(r => r.id)) + 1 : 1;
+        // Ensure the new object structure matches your data model
+        setRowData([...rowData, { ...newOrUpdatedRow, id: newId, reference: newOrUpdatedRow.reference, title: newOrUpdatedRow.title }]);
+      }
+      // Close the modal and reset any selections
+      setIsModalOpen(false);
+      setSelectedRowData(null);
+  };
 
   const handleEditClick = (rowData) => {
     setSelectedRowData(rowData); // This should include the `id`
@@ -232,34 +237,33 @@ const onFilterChanged = useCallback((event) => {
   //   // Assuming each row data has an 'id' field
   //   alert(event.data.id);
   // };
-
   const onExportClick = () => {
     gridRef.current.api.exportDataAsExcel();
   };
 
   const ActionsCellRenderer = (props) => {
-    return (
-      <div>
-        <button onClick={() => handleEditClick(props.data)} style={{
-          marginRight: 5, 
-          border: 'none', 
-          background: 'none', 
-          cursor: 'pointer',
-          color: '#272D3B' // Sets the color for both icons
-        }}>
-          <i className="fas fa-edit"></i> {/* Font Awesome Edit Icon */}
-        </button>
-        <button onClick={() => handleDeleteClick(props.data)} style={{
-          border: 'none', 
-          background: 'none', 
-          cursor: 'pointer',
-          color: '#272D3B' // Ensures consistent color styling
-        }}>
-          <i className="fas fa-trash"></i> {/* Font Awesome Trash Icon */}
-        </button>
-      </div>
-    );
-};
+      return (
+        <div>
+          <button onClick={() => handleEditClick(props.data)} style={{
+            marginRight: 5, 
+            border: 'none', 
+            background: 'none', 
+            cursor: 'pointer',
+            color: '#272D3B' // Sets the color for both icons
+          }}>
+            <i className="fas fa-edit"></i> {/* Font Awesome Edit Icon */}
+          </button>
+          <button onClick={() => handleDeleteClick(props.data)} style={{
+            border: 'none', 
+            background: 'none', 
+            cursor: 'pointer',
+            color: '#272D3B' // Ensures consistent color styling
+          }}>
+            <i className="fas fa-trash"></i> {/* Font Awesome Trash Icon */}
+          </button>
+        </div>
+      );
+  };
 
   const [selectedRowData, setSelectedRowData] = useState(null);
 
@@ -289,7 +293,6 @@ const onFilterChanged = useCallback((event) => {
       minWidth: 180
     }
   ]);
-  
 
   return (
     <div className="page-container">
