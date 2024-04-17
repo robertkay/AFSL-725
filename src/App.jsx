@@ -55,136 +55,108 @@ const App = () => {
   // const [rowData, setRowData] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  //Using states to set the current filters and sort models (to be built)
+  const [filters, setFilters] = useState({});
+  const [sortModel, setSortModel] = useState([]);
+
+  //Will process the filters, by using the current state of the filters and returning the entityOS version of the filters.
   const processFilters = (filters) => {
+    console.log('These are my filters before processing:', filters);
     const processedFilters = [];
   
-    // if (filters['issue_responsiblecontactpersontext']) {
-    //   const filterValue = filters['issue_responsiblecontactpersontext'].filter;
-    //   // Assuming you want to check this value against two fields: firstname and surname
-    //   processedFilters.push({
-    //     field: 'issue_responsiblecontactperson_firstname',
-    //     operator: 'TEXT_IS_LIKE',
-    //     value: filterValue
-    //   });
-    //   processedFilters.push({
-    //     field: 'issue_responsiblecontactperson_surname',
-    //     operator: 'TEXT_IS_LIKE',
-    //     value: filterValue
-    //   });
-    // }
-
-    if (filters['issue_responsiblecontactpersontext']) {
-      const filterValue = filters['issue_responsiblecontactpersontext'].filter;
-      // Assuming you want to check this value against two fields: firstname and surname
-      processedFilters.push({
-        "field": "issue_responsiblecontactpersontext",
-              "comparison": "TEXT_IS_LIKE",
-              "value": filterValue
-            });
-    }
+    Object.keys(filters).forEach(key => {
+      const filter = filters[key];
+      if (filter && filter.filter) {
+        // Handle different types of filter comparisons based on your requirements
+        let comparisonType = "TEXT_IS_LIKE"; // Default, could be changed based on filter type or value
+        
+        // Example to handle different types of filters:
+        if (filter.type === 'date') {
+          comparisonType = "DATE_EQUALS"; // Just an example
+        } else if (filter.type === 'number') {
+          comparisonType = "NUMBER_EQUALS"; // Just an example
+        }
   
-    // Add additional complex filter logic as needed
+        processedFilters.push({
+          "name": key,
+          "comparison": comparisonType,
+          "value1": filter.filter
+        });
+      }
+    });
   
+    console.log('Here are my processed filters:', processedFilters);
     return processedFilters;
   };
 
+  //Controls the actual fetching of the Grid data itself
   const fetchGridData = async ({ queryKey }) => {
-    const [_key, { filters, sortModel }] = queryKey;
+    console.log('Fetch called');
+    //const [_key, { filters, sortModel }] = queryKey;
+  
     const url = '/rpc/issue/?method=ISSUE_SEARCH';
-    const criteria = {
+    let criteria = {
       "fields": [
-        // {"name": "issue_reference"},
-        // {"name": "issue_raiseddate"},
+        {"name": "issue_reference"},
         {"name": "issue_responsiblecontactpersontext"},
-        // {"name": "issue_causecontactpersontext"},
-        // {"name": "issue_responsiblecontactperson_streetstate"},
-        // {"name": "issue_responsiblecontactperson_contactbusiness_tradename"},
-        // {"name": "issue_responsiblecontactbusinesstext"},
-        // {"name": "issue_title"},
-        // {"name": "issue_seissueidentification"},
-        // {"name": "issue_seimpact"},
-        // {"name": "issue_statustext"},
-        // {"name": "issue_seclientobject1_firstname"},
       ],
-      "summaryFields":
-      [
-        {
-          "name": "count(*) issuecount"
-        }
+      "summaryFields": [
+        {"name": "count(*) issuecount"}
       ],
       "filters": processFilters(filters),
-      "sorts":
-      [ 
-        // { 
-        //   "name": "issue_modifieddate",
-        //   "direction": "desc"
-        // }
-      ],
-      "options":
-      {
+      "sorts": [],
+      //"sorts": processSorts(sortModel), // To Be Built
+      "options": {
         "rf": "json",
         "startrow": "0",
         "rows": 10	
       }
-        }
-
-    // if (filters['responsiblecontactpersontext']) {
-    //   const adviserFilter = filters['responsiblecontactpersontext'];
-    //   if (adviserFilter.filter) {  // Make sure the filter value exists
-    //     criteria.filter.push({
-    //       "field": "issue_responsiblecontactpersontext",
-    //       "operator": "TEXT_IS_LIKE",
-    //       "value": adviserFilter.filter
-    //     });
-    //   }
-    // }
-
-    // Loop through all filters from AG-Grid and add them to the criteria
-    // Object.entries(filters).forEach(([key, filter]) => {
-    //   if (filter.filterType === 'text' && filter.type === 'contains' && filter.filter) {
-    //     criteria.filter.push({
-    //       "field": key,
-    //       "operator": "TEXT_IS_LIKE",  // Assuming TEXT_IS_LIKE is the backend supported operator for contains
-    //       "value": filter.filter
-    //     });
-    //   }
-    // });
-
+    };
+  
     console.log('Updated criteria with filters:', criteria);
-    
-        const params = new URLSearchParams({ criteria: JSON.stringify(criteria) });
+  
+    // build up the params of entityOS needs it in criteria / JSON stringify structure
+    const params = new URLSearchParams({ criteria: JSON.stringify(criteria) });
     const response = await axios.post(url, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+      }
     });
+  
+    // Check for error or empty response scenarios
+    if (response.status !== 200) {
+      throw new Error('Failed to fetch data');
+    }
+  
+    //Return the found rows.
+    return response.data.data.rows;
+  };
 
-    return response.data.data.rows; // Modify based on your API's response
-};
+  const { data: rowData, refetch } = useQuery(
+    ['gridData', { filters, sortModel }],
+    () => fetchGridData({ filters, sortModel }),
+    {
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      keepPreviousData: true,
+    }
+  );
+    
+  const onFilterChanged = useCallback((event) => {
+    const newFilters = event.api.getFilterModel();
+    console.log('Current Filters:', newFilters);
+    setFilters(newFilters);
+  }, []);
 
-const { data: rowData, refetch } = useQuery(['gridData', { filters: {}, sortModel: [] }], fetchGridData, {
-  refetchOnWindowFocus: false, // Prevents refetching when the window gains focus
-  refetchOnMount: false, 
-  keepPreviousData: true, // Enable this to keep old data while loading new data
-});
-   
-const onFilterChanged = useCallback((event) => {
-  const allFilters = event.api.getFilterModel();
-  console.log('Current Filters:', allFilters);
+  const onSortChanged = useCallback((event) => {
+    const newSortModel = event.api.getSortModel();
+    setSortModel(newSortModel);
+  }, []);
 
-  // Assuming refetch is properly set up to handle this structure:
-  refetch(['gridData', { filters: allFilters, sortModel: [] }]);
-}, [refetch]);
-
-// const onSortChanged = useCallback(() => {
-//   if (gridRef.current) {
-//     const allColumnsState = gridRef.current.api.getColumnState();
-//     const sortedColumn = allColumnsState.find(s => s.sort != null);
-//     if (sortedColumn) {
-//       setSortModel([sortedColumn]);
-//     } else {
-//       setSortModel([]);
-//     }
-//   }
-// }, []);
+  // useEffect to refetch data when filters or sortModel changes
+  useEffect(() => {
+    refetch();
+  }, [filters, sortModel, refetch]);
 
   const handleSearchChange = (searchValue) => {
     gridRef.current.api.setQuickFilter(searchValue);
@@ -196,27 +168,27 @@ const onFilterChanged = useCallback((event) => {
   };
 
   const handleSaveNewRow = (newOrUpdatedRow) => {
-    // Check if we're editing an existing row (indicated by the presence of an 'id')
-    if (newOrUpdatedRow.id) {
-      // Editing existing row
-      // Make sure the object structure here matches what's expected by your grid and backend
-      const updatedRows = rowData.map(row => 
-        row.id === newOrUpdatedRow.id 
-        ? { ...row, reference: newOrUpdatedRow.reference, title: newOrUpdatedRow.title } 
-        : row
-      );
-      setRowData(updatedRows);
-    } else {
-      // Adding a new row
-      // Generate a new unique ID for the new issue
-      const newId = rowData.length > 0 ? Math.max(...rowData.map(r => r.id)) + 1 : 1;
-      // Ensure the new object structure matches your data model
-      setRowData([...rowData, { ...newOrUpdatedRow, id: newId, reference: newOrUpdatedRow.reference, title: newOrUpdatedRow.title }]);
-    }
-    // Close the modal and reset any selections
-    setIsModalOpen(false);
-    setSelectedRowData(null);
-};
+      // Check if we're editing an existing row (indicated by the presence of an 'id')
+      if (newOrUpdatedRow.id) {
+        // Editing existing row
+        // Make sure the object structure here matches what's expected by your grid and backend
+        const updatedRows = rowData.map(row => 
+          row.id === newOrUpdatedRow.id 
+          ? { ...row, reference: newOrUpdatedRow.reference, title: newOrUpdatedRow.title } 
+          : row
+        );
+        setRowData(updatedRows);
+      } else {
+        // Adding a new row
+        // Generate a new unique ID for the new issue
+        const newId = rowData.length > 0 ? Math.max(...rowData.map(r => r.id)) + 1 : 1;
+        // Ensure the new object structure matches your data model
+        setRowData([...rowData, { ...newOrUpdatedRow, id: newId, reference: newOrUpdatedRow.reference, title: newOrUpdatedRow.title }]);
+      }
+      // Close the modal and reset any selections
+      setIsModalOpen(false);
+      setSelectedRowData(null);
+  };
 
   const handleEditClick = (rowData) => {
     setSelectedRowData(rowData); // This should include the `id`
@@ -232,34 +204,33 @@ const onFilterChanged = useCallback((event) => {
   //   // Assuming each row data has an 'id' field
   //   alert(event.data.id);
   // };
-
   const onExportClick = () => {
     gridRef.current.api.exportDataAsExcel();
   };
 
   const ActionsCellRenderer = (props) => {
-    return (
-      <div>
-        <button onClick={() => handleEditClick(props.data)} style={{
-          marginRight: 5, 
-          border: 'none', 
-          background: 'none', 
-          cursor: 'pointer',
-          color: '#272D3B' // Sets the color for both icons
-        }}>
-          <i className="fas fa-edit"></i> {/* Font Awesome Edit Icon */}
-        </button>
-        <button onClick={() => handleDeleteClick(props.data)} style={{
-          border: 'none', 
-          background: 'none', 
-          cursor: 'pointer',
-          color: '#272D3B' // Ensures consistent color styling
-        }}>
-          <i className="fas fa-trash"></i> {/* Font Awesome Trash Icon */}
-        </button>
-      </div>
-    );
-};
+      return (
+        <div>
+          <button onClick={() => handleEditClick(props.data)} style={{
+            marginRight: 5, 
+            border: 'none', 
+            background: 'none', 
+            cursor: 'pointer',
+            color: '#272D3B' // Sets the color for both icons
+          }}>
+            <i className="fas fa-edit"></i> {/* Font Awesome Edit Icon */}
+          </button>
+          <button onClick={() => handleDeleteClick(props.data)} style={{
+            border: 'none', 
+            background: 'none', 
+            cursor: 'pointer',
+            color: '#272D3B' // Ensures consistent color styling
+          }}>
+            <i className="fas fa-trash"></i> {/* Font Awesome Trash Icon */}
+          </button>
+        </div>
+      );
+  };
 
   const [selectedRowData, setSelectedRowData] = useState(null);
 
@@ -289,7 +260,6 @@ const onFilterChanged = useCallback((event) => {
       minWidth: 180
     }
   ]);
-  
 
   return (
     <div className="page-container">
