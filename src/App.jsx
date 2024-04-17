@@ -55,10 +55,11 @@ const App = () => {
   // const [rowData, setRowData] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  //Using states to set the current filters and sort models.
+  //Using states to set the current filters and sort models (to be built)
   const [filters, setFilters] = useState({});
   const [sortModel, setSortModel] = useState([]);
 
+  //Will process the filters, by using the current state of the filters and returning the entityOS version of the filters.
   const processFilters = (filters) => {
     console.log('These are my filters before processing:', filters);
     const processedFilters = [];
@@ -88,6 +89,7 @@ const App = () => {
     return processedFilters;
   };
 
+  //Controls the actual fetching of the Grid data itself
   const fetchGridData = async ({ queryKey }) => {
     console.log('Fetch called');
     //const [_key, { filters, sortModel }] = queryKey;
@@ -102,9 +104,8 @@ const App = () => {
         {"name": "count(*) issuecount"}
       ],
       "filters": processFilters(filters),
-      //"filters": [],
       "sorts": [],
-      //"sorts": processSorts(sortModel), // Assuming you have a function to handle this
+      //"sorts": processSorts(sortModel), // To Be Built
       "options": {
         "rf": "json",
         "startrow": "0",
@@ -114,7 +115,7 @@ const App = () => {
   
     console.log('Updated criteria with filters:', criteria);
   
-    // Use JSON.stringify if sending as a body payload
+    // build up the params of entityOS needs it in criteria / JSON stringify structure
     const params = new URLSearchParams({ criteria: JSON.stringify(criteria) });
     const response = await axios.post(url, params, {
       headers: {
@@ -127,7 +128,8 @@ const App = () => {
       throw new Error('Failed to fetch data');
     }
   
-    return response.data.data.rows; // Modify based on your API's response
+    //Return the found rows.
+    return response.data.data.rows;
   };
 
   const { data: rowData, refetch } = useQuery(
