@@ -77,9 +77,9 @@ const App = () => {
         }
   
         processedFilters.push({
-          "field": key,
+          "name": key,
           "comparison": comparisonType,
-          "value": filter.filter
+          "value1": filter.filter
         });
       }
     });
@@ -95,6 +95,7 @@ const App = () => {
     const url = '/rpc/issue/?method=ISSUE_SEARCH';
     let criteria = {
       "fields": [
+        {"name": "issue_reference"},
         {"name": "issue_responsiblecontactpersontext"},
       ],
       "summaryFields": [
@@ -134,7 +135,7 @@ const App = () => {
     () => fetchGridData({ filters, sortModel }),
     {
       refetchOnWindowFocus: false,
-      refetchOnMount: true,
+      refetchOnMount: false,
       keepPreviousData: true,
     }
   );
