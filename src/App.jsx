@@ -85,9 +85,12 @@ const App = () => {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    const options = { day: "2-digit", month: "2-digit", year: "numeric" };
-    return date.toLocaleDateString("en-AU", options); // 'en-AU' ensures the use of day-month-year order
-  };
+    return date.toLocaleDateString("en-AU", {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    }).replace(/ /g, ' ');
+};
 
   //Will process the filters, by using the current state of the filters and returning the entityOS version of the filters.
   const processFilters = (filters) => {
@@ -105,45 +108,65 @@ const App = () => {
             comparison: "IN_LIST",
             value1: filter.values.join(","), // Convert array of selected statuses to a comma-separated string
           });
-        } else if (filter.filter) {
-          // Handle other filters like text, number, date
-          let comparisonType = "TEXT_IS_LIKE"; // Default, could be changed based on filter type or value
+        } 
 
-          if (filter.type === "date") {
-            comparisonType = "IS_NOT_NULL";
+        if (filter.filterType === "date") {
+          if (filter.dateFrom && filter.type === "equals" ) {
+            const formattedDate = formatDate(filter.dateFrom);
             processedFilters.push({
               name: key,
-              comparison: comparisonType,
-            });
-          } else if (filter.type === "date") {
-            comparisonType = "IS_NULL";
-            processedFilters.push({
-              name: key,
-              comparison: comparisonType,
-            });
-          } else if (filter.type === "date") {
-            comparisonType = "DATE_EQUALS";
-            const formattedDate = formatDate(filter.filter); // Format date
-            processedFilters.push({
-              name: key,
-              comparison: comparisonType,
+              comparison: "EQUAL_TO",
               value1: formattedDate,
             });
-          } else if (filter.type === "number") {
-            comparisonType = "NUMBER_EQUALS"; // Just an example
-          } else {
+          } 
+          else if (filter.filter === "not_null") {
             processedFilters.push({
               name: key,
-              comparison: comparisonType,
-              value1: filter.filter,
+              comparison: "IS_NOT_NULL",
+            });
+          } else if (filter.filter === "is_null") {
+            processedFilters.push({
+              name: key,
+              comparison: "IS_NULL",
+            });
+          } else if (filter.dateFrom && filter.type === "greaterThan") {
+            const formattedDate = formatDate(filter.dateFrom);
+            processedFilters.push({
+              name: key,
+              comparison: "GREATER_THAN",
+              value1: formattedDate,
+            });
+          } else if (filter.dateFrom && filter.type === "lessThan") {
+            const formattedDate = formatDate(filter.dateFrom);
+            processedFilters.push({
+              name: key,
+              comparison: "LESS_THAN",
+              value1: formattedDate,
             });
           }
+        }
+
+        else if (filter.filter) {
+          let comparisonType = "TEXT_IS_LIKE"; // Default can be overridden based on type
+          if (filter.type === "number") {
+            comparisonType = "NUMBER_EQUALS";
+          }
+          processedFilters.push({
+            name: key,
+            comparison: comparisonType,
+            value1: filter.filter,
+          });
         }
       }
     });
 
     console.log("Processed filters:", processedFilters);
     return processedFilters;
+  };
+
+  const parseDateFromEntityOS = (dateString) => {
+    const [day, month, year] = dateString.split(' ');
+    return new Date(`${month} ${day}, ${year}`);
   };
 
   //Controls the actual fetching of the Grid data itself
@@ -200,9 +223,16 @@ const App = () => {
     // Extract total count from summary
     const totalCount = parseInt(response.data.summary?.issuecount); // Convert string to number 10) || 0;
     console.log("Total issue count: ", totalCount);
+
+    // Parse and format the date fields in each row
+    const rows = response.data.data.rows.map(row => ({
+      ...row,
+      issue_raiseddate: row.issue_raiseddate ? parseDateFromEntityOS(row.issue_raiseddate) : null
+    }));
+
     return {
-      rows: response.data.data.rows,
-      totalCount: totalCount,
+      rows: rows,
+      totalCount: totalCount
     };
   };
 
@@ -396,11 +426,15 @@ const App = () => {
           return 0; // Dates are equal
         },
         browserDatePicker: true, // Enable browser date picker for easier date input
+        inRangeInclusive: false,
+        filterOptions: [
+          'equals',
+          'greaterThan',
+          'lessThan'
+        ]
       },
       valueFormatter: (params) => {
-        // console.log(`Raw date from grid: ${params.value}`);
         const formattedDate = formatDate(params.value);
-        // console.log(`Displaying formatted date in grid: ${formattedDate}`);
         return formattedDate;
       },
     },
