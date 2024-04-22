@@ -635,23 +635,97 @@ const App = () => {
       minWidth: 180,
     },
   ]);
+  
+
+  // const gridOptions = {
+  //   // other grid options if necessary
+  //   alwaysShowVerticalScroll: true, // This will ensure the scrollbar is always visible
+  //   // defaultColDef: {
+  //   //   flex: 1,
+  //   //   minWidth: 100,
+  //   //   filter: true,
+  //   //   sortable: true,
+  //   //   resizable: true,
+  //   // },
+  //   onModelUpdated: function(params) {
+  //     // const currentPage = params.api.paginationGetCurrentPage();
+  //     // const totalPages = params.api.paginationGetTotalPages();
+  //     // console.log(`!!!!Now on page ${currentPage + 1} of ${totalPages}`);
+  //   },
+  // };
+
+  const serverSideDatasource = {
+    getRows: (params) => {
+        // Example of constructing a URL with pagination parameters
+        const apiUrl = `your-api-endpoint?startRow=${params.request.startRow}&endRow=${params.request.endRow}`;
+        
+        const url = "/rpc/issue/?method=ISSUE_SEARCH";
+
+        let criteria = {
+          fields: [
+            { name: "issue_reference" },
+            { name: "issue_raiseddate" },
+            { name: "issue_responsiblecontactpersontext" },
+            { name: "issue_causecontactpersontext" },
+            { name: "issue_responsiblecontactperson_streetstate" },
+            { name: "issue_responsiblecontactperson_contactbusiness_tradename" },
+            { name: "issue_responsiblecontactbusinesstext" },
+            { name: "issue_seissueidentification" },
+            { name: "issue_seimpact" },
+            { name: "issue_title" },
+            { name: "issue_statustext" },
+          ],
+          summaryFields: [{ name: "count(*) issuecount" }],
+          filters: [],
+          sorts: [],
+          options: [],
+        };
+
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(data => {
+                const rowsThisPage = data.data.rows;
+                const lastRow = () => {
+                    if (data.morerows === "false") {
+                        return data.summary.issuecount;
+                    }
+                    return undefined;
+                };
+                
+                params.successCallback(rowsThisPage, lastRow());
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
+                params.failCallback();
+            })
+    }
+  };
 
   const gridOptions = {
-    // other grid options if necessary
-    alwaysShowVerticalScroll: true, // This will ensure the scrollbar is always visible
-    // defaultColDef: {
-    //   flex: 1,
-    //   minWidth: 100,
-    //   filter: true,
-    //   sortable: true,
-    //   resizable: true,
-    // },
-    onModelUpdated: function(params) {
-      // const currentPage = params.api.paginationGetCurrentPage();
-      // const totalPages = params.api.paginationGetTotalPages();
-      // console.log(`!!!!Now on page ${currentPage + 1} of ${totalPages}`);
+    columnDefs: [
+      {
+        field: "issue_reference",
+        headerName: "Reference",
+        flex: 1,
+        minWidth: 100,
+        filter: "agTextColumnFilter",
+      },
+      {
+        field: "issue_responsiblecontactpersontext",
+        headerName: "Adviser",
+        flex: 1,
+        minWidth: 100,
+        filter: "agTextColumnFilter",
+      },
+    ],
+    defaultColDef: {
+        flex: 1,
+        minWidth: 100,
     },
-  };
+    rowModelType: 'serverSide',
+    pagination: true,
+    paginationPageSize: 20,  // Set this as per your needs
+  }; 
 
   return (
     <div className="page-container">
