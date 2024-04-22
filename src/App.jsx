@@ -686,7 +686,7 @@ const App = () => {
           // Disable AG-Grid built-in filtering and sorting since server-side is used
           enableServerSideSorting={true}
           enableServerSideFilter={true}
-          //onPaginationChanged={onPaginationChanged}
+          onPaginationChanged={onPaginationChanged}
           serverSideInfiniteScroll="true"
           // getRowHeight={getRowHeight}
           //Added the line below for returning row ID
