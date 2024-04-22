@@ -85,12 +85,14 @@ const App = () => {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-AU", {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    }).replace(/ /g, ' ');
-};
+    return date
+      .toLocaleDateString("en-AU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/ /g, " ");
+  };
 
   //Will process the filters, by using the current state of the filters and returning the entityOS version of the filters.
   const processFilters = (filters) => {
@@ -108,18 +110,17 @@ const App = () => {
             comparison: "IN_LIST",
             value1: filter.values.join(","), // Convert array of selected statuses to a comma-separated string
           });
-        } 
+        }
 
         if (filter.filterType === "date") {
-          if (filter.dateFrom && filter.type === "equals" ) {
+          if (filter.dateFrom && filter.type === "equals") {
             const formattedDate = formatDate(filter.dateFrom);
             processedFilters.push({
               name: key,
               comparison: "EQUAL_TO",
               value1: formattedDate,
             });
-          } 
-          else if (filter.filter === "not_null") {
+          } else if (filter.filter === "not_null") {
             processedFilters.push({
               name: key,
               comparison: "IS_NOT_NULL",
@@ -144,9 +145,7 @@ const App = () => {
               value1: formattedDate,
             });
           }
-        }
-
-        else if (filter.filter) {
+        } else if (filter.filter) {
           let comparisonType = "TEXT_IS_LIKE"; // Default can be overridden based on type
           if (filter.type === "number") {
             comparisonType = "NUMBER_EQUALS";
@@ -165,7 +164,7 @@ const App = () => {
   };
 
   const parseDateFromEntityOS = (dateString) => {
-    const [day, month, year] = dateString.split(' ');
+    const [day, month, year] = dateString.split(" ");
     return new Date(`${month} ${day}, ${year}`);
   };
 
@@ -196,10 +195,12 @@ const App = () => {
         rf: "json",
         startrow: 0,
         rows: 500,
+        //   startrow: (currentPage - 1) * pageSize, // Calculate the starting row
+        // rows: pageSize, // Number of rows per page
       },
     };
 
-    console.log("Updated criteria with filters:", criteria);
+    console.log(`Criteria sent to server:`, JSON.stringify(criteria, null, 2));
 
     // build up the params of entityOS needs it in criteria / JSON stringify structure
     const params = new URLSearchParams({ criteria: JSON.stringify(criteria) });
@@ -221,18 +222,24 @@ const App = () => {
     }
 
     // Extract total count from summary
-    const totalCount = parseInt(response.data.summary?.issuecount); // Convert string to number 10) || 0;
+    const totalCount = parseInt(response.data.summary.issuecount, 10) || 0; // Convert string to number 10) || 0;
     console.log("Total issue count: ", totalCount);
 
     // Parse and format the date fields in each row
-    const rows = response.data.data.rows.map(row => ({
+    const rows = response.data.data.rows.map((row) => ({
       ...row,
-      issue_raiseddate: row.issue_raiseddate ? parseDateFromEntityOS(row.issue_raiseddate) : null
+      issue_raiseddate: row.issue_raiseddate
+        ? parseDateFromEntityOS(row.issue_raiseddate)
+        : null,
     }));
+
+    console.log(
+      `Received ${response.data.data.rows.length} rows from server. Total count: ${response.data.summary.issuecount}`
+    );
 
     return {
       rows: rows,
-      totalCount: totalCount
+      totalCount: totalCount,
     };
   };
 
@@ -248,6 +255,7 @@ const App = () => {
       onSuccess: (data) => {
         setRowData(data.rows); // Set the row data
         setTotalRowCount(data.totalCount); // Set the total row count
+        console.log("Total issue count from fetch:", data.totalCount);
       },
     }
   );
@@ -256,18 +264,66 @@ const App = () => {
     if (!gridRef.current) return;
     const newPage = gridRef.current.api.paginationGetCurrentPage() + 1;
     const newPageSize = gridRef.current.api.paginationGetPageSize();
+    console.log(
+      `Pagination changed. Current page: ${newPage}, Page size: ${newPageSize}`
+    );
+    const totalPages = gridRef.current.api.paginationGetTotalPages();
+    console.log("Total pages:", totalPages);
     if (currentPage !== newPage || pageSize !== newPageSize) {
+      console.log(
+        `Updating page from ${currentPage} to ${newPage} and size from ${pageSize} to ${newPageSize}`
+      );
       setCurrentPage(newPage);
       setPageSize(newPageSize);
       refetch();
     }
   }, [currentPage, pageSize, refetch]);
 
-  const onFilterChanged = useCallback((event) => {
-    const newFilters = event.api.getFilterModel();
-    console.log("Current Filters:", newFilters);
-    setFilters(newFilters);
+  //   const onPaginationChanged = useCallback(() => {
+  //     if (!gridRef.current) return;
+  //     const newPage = gridRef.current.api.paginationGetCurrentPage() + 1;
+  //     if (currentPage !== newPage) {
+  //       setCurrentPage(newPage);
+  //       refetch();
+  //     }
+  //   }, [currentPage, refetch]);
+
+  // const onFilterChanged = useCallback((event) => {
+  //   const newFilters = event.api.getFilterModel();
+  //   console.log("Current Filters:", newFilters);
+  //   setFilters(newFilters);
+  // }, []);
+
+  //This function retains the issue_title filter (search input) even when it updates the state based on column filters
+  // const onFilterChanged = useCallback((event) => {
+  //   const columnFilters = event.api.getFilterModel();
+  //   setFilters((currentFilters) => {
+  //     return {
+  //       ...currentFilters,
+  //       ...columnFilters,
+  //     };
+  //   });
+  // }, []);
+
+  const onFilterChanged = useCallback(() => {
+    const columnFilters = event.api.getFilterModel();
+
+    // Filter out entries with empty values
+    const filteredFilters = Object.entries(columnFilters)
+      .filter(([key, value]) => value !== null && value !== undefined)
+      .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+
+    setFilters(filteredFilters);
   }, []);
+
+  //This code allows me to remove filters properly but then I can't combine search input filtering with column filtering
+  // const onFilterChanged = useCallback((event) => {
+  //   // Get the current filter model from the grid
+  //   const allFilters = event.api.getFilterModel();
+
+  //   // Update the filters state based on the current grid filters
+  //   setFilters(allFilters);
+  // }, []);
 
   const debouncedSetSortModel = useCallback(
     debounce((newSortModel) => {
@@ -299,11 +355,50 @@ const App = () => {
   useEffect(() => {
     console.log("Refetching data due to sort or filter change");
     refetch();
-  }, [filters, sortModel, refetch]);
+  }, [filters, sortModel, currentPage, pageSize, refetch]);
+
+  // const handleSearchChange = (searchValue) => {
+  //   gridRef.current.api.setQuickFilter(searchValue);
+  // };
+
+  // const setDebouncedFilters = useCallback(debounce((searchValue) => {
+  //   setFilters(filters => ({
+  //     ...filters, // maintain other existing filters
+  //     issue_title: { filterType: "text", filter: searchValue }
+  //   }));
+  // }, 500), []); // 500 ms delay
+
+  //This function updates the filters for the "Title" column without affecting the other column filters
+  const setDebouncedFilters = useCallback(
+    debounce((searchValue) => {
+      setFilters((filters) => {
+        const updatedFilters = { ...filters };
+        if (searchValue) {
+          updatedFilters["issue_title"] = {
+            filterType: "text",
+            filter: searchValue,
+          };
+        } else {
+          delete updatedFilters["issue_title"];
+        }
+        return updatedFilters;
+      });
+    }, 500),
+    []
+  ); // 500 ms delay
 
   const handleSearchChange = (searchValue) => {
-    gridRef.current.api.setQuickFilter(searchValue);
+    setDebouncedFilters(searchValue);
   };
+
+  // const getRowHeight = useCallback((params) => {
+  //   // You can customize this logic based on your application's requirements
+  //   if (params.node.group) {  // Assuming grouping is used
+  //     return 100;  // Height for group rows
+  //   } else {
+  //     return 25;  // Standard row height
+  //   }
+  // }, []);
 
   const handleAddNewClick = () => {
     setSelectedRowData(null); // Explicitly clear any selection
@@ -427,11 +522,7 @@ const App = () => {
         },
         browserDatePicker: true, // Enable browser date picker for easier date input
         inRangeInclusive: false,
-        filterOptions: [
-          'equals',
-          'greaterThan',
-          'lessThan'
-        ]
+        filterOptions: ["equals", "greaterThan", "lessThan"],
       },
       valueFormatter: (params) => {
         const formattedDate = formatDate(params.value);
@@ -529,6 +620,18 @@ const App = () => {
     },
   ]);
 
+  const gridOptions = {
+    // other grid options if necessary
+    alwaysShowVerticalScroll: true, // This will ensure the scrollbar is always visible
+    // defaultColDef: {
+    //   flex: 1,
+    //   minWidth: 100,
+    //   filter: true,
+    //   sortable: true,
+    //   resizable: true,
+    // },
+  };
+
   return (
     <div className="page-container">
       <Navbar onSearchChange={handleSearchChange} />
@@ -546,15 +649,16 @@ const App = () => {
         onClose={() => setIsModalOpen(false)}
         editRow={selectedRowData}
       />
-      <div className="ag-theme-alpine" style={{ height: 500, width: "100%" }}>
+      <div className="ag-theme-alpine" style={{ height: 750, width: "100%" }}>
         <AgGridReact
           ref={gridRef}
           columnDefs={columnDefs}
           rowData={rowData}
-          domLayout="autoHeight"
+          gridOptions={gridOptions}
+          domLayout="normal"
           rowSelection="single"
           pagination={true}
-          paginationPageSize={pageSize}
+          paginationPageSize={20}
           paginationTotalRowCount={totalRowCount}
           onFilterChanged={onFilterChanged}
           onSortChanged={onSortChanged}
@@ -562,6 +666,8 @@ const App = () => {
           enableServerSideSorting={true}
           enableServerSideFilter={true}
           onPaginationChanged={onPaginationChanged}
+          serverSideInfiniteScroll="true"
+          // getRowHeight={getRowHeight}
           //Added the line below for returning row ID
           // onRowClicked={onRowClicked}
         ></AgGridReact>
