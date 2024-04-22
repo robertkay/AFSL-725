@@ -78,6 +78,7 @@ const App = () => {
   //Using states to set the current filters and sort models (to be built)
   const [filters, setFilters] = useState({});
   const [sortModel, setSortModel] = useState([]);
+  const [optionsModel, setOptionsModel] = useState([]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -191,13 +192,7 @@ const App = () => {
       summaryFields: [{ name: "count(*) issuecount" }],
       filters: processFilters(filters),
       sorts: processSorts(sortModel),
-      options: {
-        rf: "json",
-        startrow: 0,
-        rows: 500,
-        //   startrow: (currentPage - 1) * pageSize, // Calculate the starting row
-        // rows: pageSize, // Number of rows per page
-      },
+      options: processOptions(optionsModel),
     };
 
     console.log(`Criteria sent to server:`, JSON.stringify(criteria, null, 2));
@@ -349,6 +344,27 @@ const App = () => {
       name: colId, // Assuming colId corresponds directly to the field names expected by your backend
       direction: sort, // 'asc' or 'desc' as returned by AG-Grid
     }));
+  };
+
+  const processOptions = (optionsModel) => {
+    
+    const currentPage = gridRef.current.api.paginationGetCurrentPage();
+    const pageSize = gridRef.current.api.paginationGetPageSize();
+    
+    let startRow = 0;
+    if(currentPage === 0) {
+
+    }
+    else {
+      //Work out where we should start this search
+      startRow = startRow * (currentPage+1) * pageSize;
+    }
+   
+    return {
+      rf: "json",
+      startrow: startRow, 
+      rows: pageSize
+    };
   };
 
   // useEffect to refetch data when filters or sortModel changes
@@ -630,6 +646,11 @@ const App = () => {
     //   sortable: true,
     //   resizable: true,
     // },
+    onModelUpdated: function(params) {
+      // const currentPage = params.api.paginationGetCurrentPage();
+      // const totalPages = params.api.paginationGetTotalPages();
+      // console.log(`!!!!Now on page ${currentPage + 1} of ${totalPages}`);
+    },
   };
 
   return (
@@ -665,7 +686,7 @@ const App = () => {
           // Disable AG-Grid built-in filtering and sorting since server-side is used
           enableServerSideSorting={true}
           enableServerSideFilter={true}
-          onPaginationChanged={onPaginationChanged}
+          //onPaginationChanged={onPaginationChanged}
           serverSideInfiniteScroll="true"
           // getRowHeight={getRowHeight}
           //Added the line below for returning row ID
